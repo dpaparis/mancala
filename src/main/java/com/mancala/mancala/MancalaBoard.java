@@ -64,6 +64,10 @@ public class MancalaBoard {
         board[pit] = (byte) ((int) board[pit] + value);
     }
 
+    /**
+     * the game is over if either player has an empty row
+     * @return boolean indicating that the game has ended
+     */
     public boolean isGameOver() {
         boolean player1Done = true;
         boolean player2Done = true;
@@ -110,15 +114,13 @@ public class MancalaBoard {
 
     /**
      * @param pit
-     * @return a move is valid if it's in the player's own row and the pit is not empty
+     * @return boolean a move is valid if it's in the range 1-6 and that pit is not empty
      */
     public boolean isValidMove(int pit) {
-        if ((int) board[pit] == 0) return false;
-        if (playerTurn == 1) {
-            return pit >= 0 && pit < player1Mancala;
-        } else {
-            return pit > player1Mancala && pit < player2Mancala;
-        }
+        if (pit < 1 || pit > 6) return false;
+        int index = playerPitPickToBoardIndex(pit);
+        if ((int) board[index] == 0) return false;
+        return true;
     }
 
     protected void changePlayerTurn() {
@@ -128,12 +130,34 @@ public class MancalaBoard {
             playerTurn = 1;
         }
     }
+
+    /**
+     *
+     * @param pit
+     * @return translates the picked pit (1-6) to an index for the byte array where we store the board state
+     */
+    protected int playerPitPickToBoardIndex(int pit) {
+        if (getPlayerTurn() == 1) {
+            // player can pick 1 through 6, this translates to index 0-5 in the array
+            return pit -1;
+        } else {
+            // player can pick 1 through 6, this translates to index 7-12 in the array
+            return pit + 6;
+        }
+    }
+
+    /**
+     * logic for taking a turn: take stones from the picked pit and traverse board counterclockwise
+     * placing a stone in each pit you traverse (including your own mancala, but skipping your opponent's mancala)
+     * @param pit
+     */
     public void takeTurn(int pit) {
+        int index = playerPitPickToBoardIndex(pit);
         boolean switchTurn = true;
-        int numStones = board[pit];
+        int numStones = board[index];
         // first step take stones
-        setPitValue(pit, 0);
-        int current = pit + 1;
+        setPitValue(index, 0);
+        int current = index + 1;
         for (int i=0;i<numStones;i++) {
             // check if is other mancala, then skip it
             if (playerTurn == 1 && current == player2Mancala) {
@@ -159,7 +183,14 @@ public class MancalaBoard {
         if (switchTurn) changePlayerTurn();
     }
 
+    /**
+     * Special logic for placing the last stone: if last stone is placed in on of your own empty pits, you capture
+     * the pieces in your opponent's opposite pit, if the last stone is placed in your mancala then you can go again
+     * @param current
+     * @return
+     */
     private boolean lastStone(int current) {
+        // TODO: should put some message here to print capturing stones or go again
         // if we place last stone in an empty pit in own row capture opposite pieces
         if ((int) board[current] == 1) {
             // capture opposite pieces
@@ -175,7 +206,7 @@ public class MancalaBoard {
                 incrementPitValue(player2Mancala, oppositeStones);
             }
         }
-        // if place last stone in own mancala go again
+        // if last stone is placed in own mancala go again
         if (playerTurn == 1 && current == player1Mancala) {
             return false;
         } else if (playerTurn == 2 && current == player2Mancala) {
@@ -186,9 +217,17 @@ public class MancalaBoard {
 
     @Override
     public String toString() {
-        return "MancalaBoard{" +
-                "playerTurn=" + playerTurn + "\n" +
-                ", board=" + Arrays.toString(board) +
-                '}';
+        StringBuilder player2Row = new StringBuilder("| ");
+        for (int i=player2Mancala-1;i>player1Mancala;i--) {
+            player2Row.append(getStonesInPit(i)).append(" | ");
+        }
+        StringBuilder player1Row = new StringBuilder("| ");
+        for (int i=0;i<player1Mancala;i++) {
+            player1Row.append(getStonesInPit(i)).append(" | ");
+        }
+        return "Player turn: " + playerTurn + "\n" +
+                ", board=" + Arrays.toString(board) + "\n" +
+                "Mancala 2: " + getPlayer2Score() + "   " + player2Row + "\n" +
+                "               " + player1Row + " Mancala 1: " + getPlayer1Score();
     }
 }
