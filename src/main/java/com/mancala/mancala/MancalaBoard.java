@@ -1,13 +1,11 @@
 package com.mancala.mancala;
 
-import java.util.Arrays;
-
 public class MancalaBoard {
 
-    static private int player1Mancala = 6;
-    static private int player2Mancala = 13;
-    static private int startStones = 4;
-    static private int boardLength = 14;
+    static private final int player1Mancala = 6;
+    static private final int player2Mancala = 13;
+    static private final int boardLength = 14;
+    static private boolean switchTurn = true;
 
     // default to player 1 always starting
     private int playerTurn = 1;
@@ -16,7 +14,8 @@ public class MancalaBoard {
 
     public MancalaBoard() {
         // initialize board
-        for (int i=0;i<player1Mancala;i++) {
+        int startStones = 4;
+        for (int i = 0; i<player1Mancala; i++) {
             this.board[i] = (byte) startStones;
         }
         for (int i=player1Mancala+1;i<player2Mancala;i++) {
@@ -52,8 +51,8 @@ public class MancalaBoard {
         return playerTurn;
     }
 
-    private void setPitValue(int pit, int value) {
-      board[pit] = (byte) value;
+    private void setPitValueToZero(int pit) {
+      board[pit] = (byte) 0;
     }
 
     private void incrementPitValue(int pit) {
@@ -74,26 +73,28 @@ public class MancalaBoard {
         for (int i=0;i<player1Mancala;i++) {
             if ((int) board[i] > 0) {
                 player1Done = false;
+                break;
             }
         }
         if (player1Done) {
             // player 2 gets to capture all remaining pieces on his/her row
             for (int i=player1Mancala+1;i<player2Mancala;i++) {
-                incrementPitValue(player2Mancala, (int) board[i]);
-                setPitValue(i, 0);
+                incrementPitValue(player2Mancala, board[i]);
+                setPitValueToZero(i);
             }
             return true;
         }
         for (int i=player1Mancala+1;i<player2Mancala;i++) {
             if ((int) board[i] > 0) {
                 player2Done = false;
+                break;
             }
         }
         if (player2Done) {
             // player 1 gets to capture all remaining pieces on his/her row
             for (int i=0;i<player1Mancala;i++) {
-                incrementPitValue(player1Mancala, (int) board[i]);
-                setPitValue(i, 0);
+                incrementPitValue(player1Mancala, board[i]);
+                setPitValueToZero(i);
             }
             return true;
         }
@@ -119,8 +120,7 @@ public class MancalaBoard {
     public boolean isValidMove(int pit) {
         if (pit < 1 || pit > 6) return false;
         int index = playerPitPickToBoardIndex(pit);
-        if ((int) board[index] == 0) return false;
-        return true;
+        return (int) board[index] != 0;
     }
 
     protected void changePlayerTurn() {
@@ -150,16 +150,18 @@ public class MancalaBoard {
      * logic for taking a turn: take stones from the picked pit and traverse board counterclockwise
      * placing a stone in each pit you traverse (including your own mancala, but skipping your opponent's mancala)
      * @param pit
+     * @return String message to print out
      */
-    public void takeTurn(int pit) {
+    public String takeTurn(int pit) {
+        switchTurn = true;
+        String message = null;
         int index = playerPitPickToBoardIndex(pit);
-        boolean switchTurn = true;
         int numStones = board[index];
         // first step take stones
-        setPitValue(index, 0);
+        setPitValueToZero(index);
         int current = index + 1;
         for (int i=0;i<numStones;i++) {
-            // check if is other mancala, then skip it
+            // check if is other player's mancala, then skip it
             if (playerTurn == 1 && current == player2Mancala) {
                 current = 0;
             }
@@ -169,7 +171,7 @@ public class MancalaBoard {
             incrementPitValue(current);
             // last stone logic
             if (i==numStones-1) {
-                switchTurn = lastStone(current);
+                message = lastStone(current);
                 break;
             }
             current++;
@@ -181,42 +183,51 @@ public class MancalaBoard {
 
         // set correct player turn
         if (switchTurn) changePlayerTurn();
+        return message;
     }
 
     /**
      * Special logic for placing the last stone: if last stone is placed in on of your own empty pits, you capture
      * the pieces in your opponent's opposite pit, if the last stone is placed in your mancala then you can go again
      * @param current
-     * @return
+     * @return String with message to be printed for special cases
      */
-    private boolean lastStone(int current) {
-        // TODO: should put some message here to print capturing stones or go again
-        // if we place last stone in an empty pit in own row capture opposite pieces
+    protected String lastStone(int current) {
+        String message = null;
+        // if we placed the last stone in an empty pit in own row capture opposite pieces
         if ((int) board[current] == 1) {
             // capture opposite pieces
             // opposite pit is 12 - current
             if (playerTurn == 1 && isPlayer1Row(current)) {
                 // place stone and capture other pieces
-                int oppositeStones = (int) board[12-current];
-                setPitValue(12-current, 0);
+                int oppositeStones = board[12-current];
+                setPitValueToZero(12-current);
                 incrementPitValue(player1Mancala, oppositeStones);
+                message = "Captured " + oppositeStones + " opponent stones!";
             } else if (playerTurn == 2 && isPlayer2Row(current)) {
-                int oppositeStones = (int) board[12-current];
-                setPitValue(12-current, 0);
+                int oppositeStones = board[12-current];
+                setPitValueToZero(12-current);
                 incrementPitValue(player2Mancala, oppositeStones);
+                message = "Captured " + oppositeStones + " opponent stones!";
             }
         }
         // if last stone is placed in own mancala go again
-        if (playerTurn == 1 && current == player1Mancala) {
-            return false;
-        } else if (playerTurn == 2 && current == player2Mancala) {
-            return false;
+        if ((playerTurn == 1 && current == player1Mancala) || (playerTurn == 2 && current == player2Mancala)) {
+            switchTurn = false;
+            message = "Go again";
         }
-        return true;
+        return message;
     }
 
     @Override
+    /**
+     * builds a more user friendly string representation of the board state
+     * player 2 mancala is all the way to the left and player 2's row is on top ordered from 1 to 6, right to left,
+     * simulating player 2 sitting across from player 1
+     * player 1 mancala is on the far right and player 1's row is ordered from left to right
+     */
     public String toString() {
+        //TODO: rotate board for player 2 turn
         StringBuilder player2Row = new StringBuilder("| ");
         for (int i=player2Mancala-1;i>player1Mancala;i--) {
             player2Row.append(getStonesInPit(i)).append(" | ");
@@ -225,9 +236,10 @@ public class MancalaBoard {
         for (int i=0;i<player1Mancala;i++) {
             player1Row.append(getStonesInPit(i)).append(" | ");
         }
-        return "Player turn: " + playerTurn + "\n" +
-                ", board=" + Arrays.toString(board) + "\n" +
-                "Mancala 2: " + getPlayer2Score() + "   " + player2Row + "\n" +
-                "               " + player1Row + " Mancala 1: " + getPlayer1Score();
+        StringBuilder spaces = new StringBuilder();
+        int numSpaces = getPlayer2Score() > 9 ? 15 : 14;
+        spaces.append(" ".repeat(numSpaces + 1));
+        return "Mancala 2: " + getPlayer2Score() + "   " + player2Row + "\n" +
+                spaces + player1Row + " Mancala 1: " + getPlayer1Score();
     }
 }
